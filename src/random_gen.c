@@ -5,23 +5,6 @@
 #include <math.h>
 #include <time.h>
 
-#define ROWS 4096
-#define COLS 4096
-//#define ROWS 2048
-//#define COLS 2048
-//#define ROWS 1024
-//#define COLS 1024
-//#define ROWS 512
-//#define COLS 512
-//#define ROWS 32
-//#define COLS 32
-//#define ROWS 16
-//#define COLS 16
-//#define ROWS 8
-//#define COLS 8
-//#define ROWS 4
-//#define COLS 4
-
 float generate_rand(float file_r);
 
 int main(int argc, char* argv[]) {
@@ -32,7 +15,9 @@ int main(int argc, char* argv[]) {
     FILE *fp;
     srand(time(NULL));
     
-    int id=atoi(argv[1]);
+    int n=atoi(argv[1]);
+    int ROWS = n;
+    int COLS = n;
     
     //allocate 2d ROWS x COLS array
     float *mat[ROWS];
@@ -69,7 +54,7 @@ int main(int argc, char* argv[]) {
     }
     
     //open file for writing
-    sprintf(op_file_name,"matrix_%d_%d.txt",ROWS,id);
+    sprintf(op_file_name, argv[2]);
     fp = fopen(op_file_name, "w");
 
     for(i=0; i<ROWS; i++){

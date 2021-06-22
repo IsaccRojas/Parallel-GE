@@ -68,8 +68,8 @@ char* read_word(int fd, off_t offset, off_t *end) {
 
 int main(int argc, char *argv[]) {
 	//parameters/variables
-	int n, id, bs, r, config, genUX;
-	int nodes, myid, numprocs, i, j, k, offset, rows, cols, fd, starting_i, data_size, block_size, block_rows, cycle, cycle_rows, pivotproc, local_i, global_i, global_k, partial_sum;
+	int n, r, bs, genUX;
+	int myid, numprocs, i, j, k, offset, rows, cols, fd, starting_i, data_size, block_size, block_rows, cycle, cycle_rows, pivotproc, local_i, global_i, global_k, partial_sum;
 	double PI25DT = 3.141592653589793238462643;
 	double val, pivotval, sum, runtime_dd, runtime_ge, runtime_bs, x_checksum_even, x_checksum_odd, u_checksum_even, u_checksum_odd;
 	double *mat;
@@ -88,30 +88,28 @@ int main(int argc, char *argv[]) {
 	MPI_Comm_rank(MPI_COMM_WORLD, &myid);
 
 	if (myid == 0) {
-		if (argc < 9) {
+		if (argc < 6) {
 			printf("error: invalid number of arguments\n");
 			return -1;
 		}
 
-		//get n and r
-		n = atoi(argv[1]);
-		id = atoi(argv[2]);
-		fd = open(argv[3], O_RDONLY);
+		//get n, r, bs, and genUX
+		n = atoi(argv[2]);
+		r = atoi(argv[3]);
 		bs = atoi(argv[4]);
-		r = atoi(argv[5]);
-		if (strcmp(argv[6], "SM") == 0)
-			nodes = max(1, numprocs / 16);
-		else
-			nodes = min(8, numprocs);
-		genUX = atoi(argv[7]);
+		genUX = atoi(argv[5]);
 		
-		//send n and r to processors
+		//send n, r and bs to processors
 		for (k = 1; k < numprocs; k++) {
 			MPI_Send(&n, 1, MPI_INT, k, 0, MPI_COMM_WORLD);	
 			MPI_Send(&r, 1, MPI_INT, k, 0, MPI_COMM_WORLD);	
 			MPI_Send(&bs, 1, MPI_INT, k, 0, MPI_COMM_WORLD);
 		}
 
+		//attempt to open filename
+		fd = open(argv[1], O_RDONLY);
+
+		//allocate global matrix and current parsing character c
 		global_mat = malloc(sizeof(double) * (n * (n + 1)));
 		c = malloc(sizeof(char));
 		offset = 0; i = 0; j = 0; k = 0; cols = 0;
@@ -122,7 +120,8 @@ int main(int argc, char *argv[]) {
 			val = atof(word);
 			free(word);
 			global_mat[k] = val;
-				
+			
+			//increment to next matrix element; break if at end
 			j++;
 			if (j == n + 1) {
 				i++;
@@ -153,10 +152,13 @@ int main(int argc, char *argv[]) {
 		//distribute rows to all processors
 		runtime_dd = MPI_Wtime();
 
+		//store parameters
 		cycle_rows = n / r;
 		block_rows = cycle_rows / numprocs;
 		block_size = (n + 1) * block_rows;
 		data_size = r * block_size;
+
+		//send matrix data to all other processors or copy to local memory
 		mat = malloc(sizeof(double) * data_size);
 		for (k = 0; k < numprocs * r; k++) {
 			if (k % numprocs != 0)
@@ -170,11 +172,13 @@ int main(int argc, char *argv[]) {
 		MPI_Recv(&r, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 		MPI_Recv(&bs, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	
-		//receive r rows from "root" processor
+		//store parameters
 		cycle_rows = n / r;
 		block_rows = cycle_rows / numprocs;
 		block_size = (n + 1) * block_rows;
 		data_size = (n * (n + 1)) / numprocs;
+
+		//receive r rows from "root" processor
 		mat = malloc(sizeof(double) * data_size);
 		for (k = 0; k < r; k++)
 			MPI_Recv(mat + (k * block_size), block_size, MPI_DOUBLE, 0, k, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
@@ -416,7 +420,7 @@ int main(int argc, char *argv[]) {
 	if (myid == 0) {
 		//get and open stats filename
 		char filename[256];
-		sprintf(filename, "op_P%d_%s_bs%d_r%d_n%d_%d_stats_%s.txt", numprocs, argv[6], bs, r, n, id, argv[8]);
+		sprintf(filename, "op_%s_P%d_n%d_r%d_bs%d_stats.txt", argv[1], numprocs, n, r, bs);
 		fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0666);
 
 		//print metrics
@@ -424,7 +428,6 @@ int main(int argc, char *argv[]) {
 		dprintf(fd, "n: %d\n", n);
 		dprintf(fd, "r: %d\n", r);
 		dprintf(fd, "bs: %d\n", bs);
-		dprintf(fd, "combination: nodes = %d, ppn = %d\n", nodes, numprocs / nodes);
 		dprintf(fd, "total runtime: \t%.16fs\n", runtime_dd + runtime_ge + runtime_bs);
 		dprintf(fd, "ge runtime: \t%.16fs\n", runtime_ge);
 		dprintf(fd, "ge+bs runtime: \t%.16fs\n", runtime_ge + runtime_bs);
@@ -436,7 +439,7 @@ int main(int argc, char *argv[]) {
 
 		if (genUX) {
 			//get and open UX filename
-			sprintf(filename, "op_P%d_%s_bs%d_r%d_n%d_%d_UX_%s.txt", numprocs, argv[6], bs, r, n, id, argv[8]);
+			sprintf(filename, "op_%s_P%d_n%d_r%d_bs%d_UX.txt", argv[1], numprocs, n, r, bs);
 			fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0666);
 			
 			//print metrics
@@ -444,7 +447,6 @@ int main(int argc, char *argv[]) {
 			dprintf(fd, "n: %d\n", n);
 			dprintf(fd, "r: %d\n", r);
 			dprintf(fd, "bs: %d\n", bs);
-			dprintf(fd, "combination: nodes = %d, ppn = %d\n", nodes, numprocs / nodes);
 			for (i = 0; i < n; i++) {
 				dprintf(fd, "%.16f | ", x[i]);
 				for (j = 0; j < n; j++)
