@@ -28,7 +28,7 @@ which will take a 1024x1024 matrix input file with an additional vector column, 
 
 The random matrix generation program has the following syntax:
 
->./random_gen [n] [filename]
+>./random_gen [n] [outputfile]
 
 where
 
