@@ -26,7 +26,7 @@ which will take a 1024x1024 matrix input file with an additional vector column, 
 
 ### random_gen.c
 
-The random matrix generation program has the following syntax:
+This program is to be linked with the C math library. It has the following parameter syntax:
 
 >./random_gen [n] [outputfile]
 
