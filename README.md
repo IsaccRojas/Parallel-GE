@@ -19,7 +19,7 @@ Each row is iterated on in the complete matrix, determining which processor owns
 
 ### 3. Back Substitution
 
-The following equation is then solved for each element of the solution vector **x**:
+The following equation is then solved for each element of the solution vector **x** (prime terms are elements belonging to the input matrix after the elimination step):
 
 ![Back substitution figure 1.](https://i.imgur.com/YmNYgnZ.gif)
 
